@@ -1,17 +1,19 @@
 from bs4 import BeautifulSoup
 import csv
 import requests
+import lxml
 import pandas as pd
 import datetime as dt
 import os.path
 
+# Create an array that stores the links of the articles and have each of the if/for statements check to see if the link has been pulled before trying to scrape
 
 # Checks to see if our outfile for the news articles has been created in the PWD.
 try:
     if os.path.isfile('news_scrape.csv'):
         csv_file = open('news_scrape.csv', 'a', encoding='utf-8-sig')
         csv_writer = csv.writer(csv_file)
-# If the file does not exist, creates it
+    # If the file does not exist, creates it
     else:
         csv_file = open('news_scrape.csv', 'w', encoding='utf-8-sig')
         csv_writer = csv.writer(csv_file)
@@ -20,17 +22,25 @@ except Exception as e:
     print(e)
     exit()
 
-# Opens our subjects.csv and stores it in an array
-subject = []
-with open('subjects.csv', encoding='utf-8-sig', newline='') as f:
-    for row in csv.reader(f):
-        subject.append(row[0])
+try:
+    # Opens our subjects.csv and stores it in an array
+    subject = []
+    with open('subjects.csv', encoding='utf-8-sig', newline='') as f:
+        for row in csv.reader(f):
+            subject.append(row[0])
+except Exception as e:
+    print(e)
+    print("subjects.csv could not be loaded or does not exist, please verify you have that file in the root directory of this project with atleast one subject.")
 
-# Opens our sites.csv and stores it in an array
-sites = []
-with open('sites.csv', encoding='utf-8-sig', newline='') as file:
-    for row in csv.reader(file):
-        sites.append(row[0])
+try:
+    # Opens our sites.csv and stores it in an array
+    sites = []
+    with open('sites.csv', encoding='utf-8-sig', newline='') as file:
+        for row in csv.reader(file):
+            sites.append(row[0])
+except Exception as e:
+    print(e)
+    print("sites.csv could not be loaded or does not exist, please verify you have that file in the root directory of this project with atleast one site URL.")
 
 for site in sites:
     source = requests.get(site).text
@@ -57,6 +67,87 @@ for site in sites:
                         csv_writer.writerow([subjects, date, headline, summary, link])
                     except Exception as e:
                         print(e)
+                else:
+                    continue
+
+    # Scrapes news from Threatpost
+    elif "threatpost" in site:
+        for article in soup.find_all('article'):
+            for subjects in subject:
+                if article.find_all(text=lambda t: t and subjects in t):
+
+                    try:
+                        headline = article.h2.text
+                        summary = article.find('p').text
+                        link = article.find('a')['href']
+                        date = dt.date.today()
+                        posted = article.find('time').text
+                    except Exception as e:
+                        print(e)
+                        continue
+                    # Prints our scraped data to the console for logging and an extra line to keep it clean
+                    print(headline, summary, link, posted, sep='\n')
+                    print()
+                    # Tries to write the data to the news_scape.csv and skips that article if it runs into trouble
+                    try:
+                        csv_writer.writerow([subjects, date, headline, summary, link, posted])
+                    except Exception as e:
+                        print(e)
+                else:
+                    continue
+
+    # Scrapes news from Krebs on security
+    elif "krebsonsecurity" in site:
+        for article in soup.find_all('div', class_='post-smallerfont'):
+            for subjects in subject:
+                if article.find_all(text=lambda t: t and subjects in t):
+
+                    try:
+                        headline = article.h2.text
+                        summary = article.find('p').text
+                        link = article.find('a')['href']
+                        date = dt.date.today()
+                    except Exception as e:
+                        print(e)
+                        continue
+                    # Prints our scraped data to the console for logging and an extra line to keep it clean
+                    print(headline, summary, link, sep='\n')
+                    print()
+                    # Tries to write the data to the news_scape.csv and skips that article if it runs into trouble
+                    try:
+                        csv_writer.writerow([subjects, date, headline, summary, link])
+                    except Exception as e:
+                        print(e)
+                else:
+                    continue
+
+    # Scrapes news from ZDNet
+    elif "zdnet" in site:
+        for article in soup.find_all('div', {"class": "content"}):
+            for subjects in subject:
+                if article.find_all(text=lambda t: t and subjects in t):
+                    link = article.find('a')['href']
+                    exclude = ['video', 'product']
+                    if not any(exclusion in link for exclusion in exclude):
+                        try:
+                            headline = article.find('a').text
+                            summary = article.find('p', {"class": "summary"}).text
+                            link = "https://www.zdnet.com" + link
+                            date = dt.date.today()
+                            posted = article.find('span').text
+                        except Exception as e:
+                            print(e)
+                            continue
+                        # Prints our scraped data to the console for logging and an extra line to keep it clean
+                        print(headline, summary, link, posted, sep='\n')
+                        print()
+                        # Tries to write the data to the news_scape.csv and skips that article if it runs into trouble
+                        try:
+                            csv_writer.writerow([subjects, date, headline, summary, link, posted])
+                        except Exception as e:
+                            print(e)
+                    else:
+                        print('Contains a video or Ad... Skipping...')
                 else:
                     continue
 
